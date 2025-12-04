@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">M Recorder</string>
+    <string name="record">Record</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="stop">Stop</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="share">Share</string>
+    <string name="recording">Recording…</string>
+    <string name="paused">Paused</string>
+    <string name="transcription">Transcription</string>
+    <string name="no_transcription">Start recording to see transcription</string>
+    <string name="permission_required">Microphone permission is required to record audio</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="recording_saved">Recording saved</string>
+    <string name="recording_deleted">Recording deleted</string>
+</resources>
