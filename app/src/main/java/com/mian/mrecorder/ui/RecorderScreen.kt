@@ -1,36 +1,27 @@
 package com.mian.mrecorder.ui
 
 import android.Manifest
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.mian.mrecorder.ui.components.RecordingBottomSheet
-import com.mian.mrecorder.ui.components.WaveformVisualizer
 import com.mian.mrecorder.viewmodel.RecorderViewModel
 import com.mian.mrecorder.viewmodel.RecordingState
 
@@ -57,7 +48,8 @@ fun RecorderScreen(
     }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.surface
     ) { padding ->
         Box(
             modifier = Modifier
@@ -69,32 +61,28 @@ fun RecorderScreen(
                     onRequestPermission = { micPermissionState.launchPermissionRequest() }
                 )
             } else {
+                // Empty state - clean minimal design
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
+                    modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.Top
                 ) {
-                    Text(
-                        text = "M Recorder",
-                        style = MaterialTheme.typography.displaySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Spacer(modifier = Modifier.height(120.dp))
                     
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
+                    // App title with Material 3 Expressive style
                     Text(
-                        text = "Tap to start recording",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Recorder",
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 
+                // Floating record button - Google Recorder style
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(bottom = 48.dp),
+                        .padding(bottom = 80.dp),
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     RecordButton(
@@ -142,41 +130,48 @@ fun PermissionScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .padding(40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
             imageVector = Icons.Default.Mic,
             contentDescription = null,
-            modifier = Modifier.size(80.dp),
+            modifier = Modifier.size(120.dp),
             tint = MaterialTheme.colorScheme.primary
         )
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
         
         Text(
-            text = "Microphone Access Required",
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center
+            text = "Record audio",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
         )
         
         Spacer(modifier = Modifier.height(16.dp))
         
         Text(
-            text = "To record audio, we need access to your microphone. Your recordings stay private on your device.",
+            text = "To record audio, allow Recorder to access your microphone",
             style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(48.dp))
         
-        Button(
+        FilledTonalButton(
             onClick = onRequestPermission,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
         ) {
-            Text("Grant Permission")
+            Text(
+                "Continue",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
@@ -187,32 +182,54 @@ fun RecordButton(
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (recordingState != RecordingState.IDLE) 0.85f else 1f,
-        animationSpec = tween(300), label = ""
+        targetValue = when (recordingState) {
+            RecordingState.IDLE -> 1f
+            RecordingState.RECORDING -> 0.9f
+            RecordingState.PAUSED -> 0.9f
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ), label = ""
     )
     
-    val icon: ImageVector = when (recordingState) {
-        RecordingState.IDLE -> Icons.Default.Mic
-        RecordingState.RECORDING -> Icons.Default.Pause
-        RecordingState.PAUSED -> Icons.Default.PlayArrow
-    }
+    // Pulsing animation when recording
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
     
-    FloatingActionButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(72.dp)
-            .scale(scale),
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    val buttonScale = if (recordingState == RecordingState.RECORDING) scale * pulseScale else scale
+    
+    Box(
+        modifier = Modifier.scale(buttonScale),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = when (recordingState) {
-                RecordingState.IDLE -> "Start recording"
-                RecordingState.RECORDING -> "Pause recording"
-                RecordingState.PAUSED -> "Resume recording"
-            },
-            modifier = Modifier.size(32.dp)
-        )
+        FloatingActionButton(
+            onClick = onClick,
+            modifier = Modifier.size(80.dp),
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            elevation = FloatingActionButtonDefaults.elevation(
+                defaultElevation = 6.dp,
+                pressedElevation = 12.dp
+            )
+        ) {
+            Icon(
+                imageVector = when (recordingState) {
+                    RecordingState.IDLE -> Icons.Default.Mic
+                    RecordingState.RECORDING -> Icons.Default.Pause
+                    RecordingState.PAUSED -> Icons.Default.PlayArrow
+                },
+                contentDescription = null,
+                modifier = Modifier.size(36.dp)
+            )
+        }
     }
 }
