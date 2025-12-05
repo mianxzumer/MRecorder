@@ -22,25 +22,26 @@ fun WaveformVisualizer(
     modifier: Modifier = Modifier
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
-    val secondaryColor = MaterialTheme.colorScheme.secondary
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
     
     val infiniteTransition = rememberInfiniteTransition(label = "waveform")
     val animatedPhase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
+            animation = tween(3000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "phase"
     )
     
     Canvas(modifier = modifier.fillMaxSize()) {
-        val barCount = 50
-        val barWidth = size.width / (barCount * 2f)
-        val spacing = barWidth
+        val barCount = 60
+        val barWidth = size.width / (barCount * 1.8f)
+        val spacing = barWidth * 0.8f
         val centerY = size.height / 2f
-        val maxBarHeight = size.height * 0.8f
+        val maxBarHeight = size.height * 0.9f
         
         if (amplitudes.isEmpty() || !isRecording) {
             drawIdleWaveform(
@@ -51,7 +52,8 @@ fun WaveformVisualizer(
                 maxBarHeight = maxBarHeight,
                 phase = animatedPhase,
                 primaryColor = primaryColor,
-                secondaryColor = secondaryColor
+                tertiaryColor = tertiaryColor,
+                surfaceVariant = surfaceVariant
             )
         } else {
             drawActiveWaveform(
@@ -62,7 +64,7 @@ fun WaveformVisualizer(
                 centerY = centerY,
                 maxBarHeight = maxBarHeight,
                 primaryColor = primaryColor,
-                secondaryColor = secondaryColor
+                tertiaryColor = tertiaryColor
             )
         }
     }
@@ -76,20 +78,28 @@ private fun DrawScope.drawIdleWaveform(
     maxBarHeight: Float,
     phase: Float,
     primaryColor: Color,
-    secondaryColor: Color
+    tertiaryColor: Color,
+    surfaceVariant: Color
 ) {
     for (i in 0 until barCount) {
-        val x = i * (barWidth + spacing) + barWidth / 2
+        val x = i * (barWidth + spacing)
         val normalizedX = i.toFloat() / barCount
-        val wave = sin((normalizedX * 360f + phase) * Math.PI / 180f).toFloat()
-        val barHeight = (abs(wave) * maxBarHeight * 0.3f).coerceAtLeast(8f)
         
-        val progress = i.toFloat() / barCount
-        val color = lerp(primaryColor, secondaryColor, progress)
+        // Multiple wave frequencies for organic look
+        val wave1 = sin((normalizedX * 180f + phase) * Math.PI / 180f).toFloat()
+        val wave2 = sin((normalizedX * 360f + phase * 0.7f) * Math.PI / 180f).toFloat()
+        val combinedWave = (wave1 * 0.6f + wave2 * 0.4f)
+        
+        val barHeight = (abs(combinedWave) * maxBarHeight * 0.25f).coerceAtLeast(6f)
+        
+        // Gradient from primary to tertiary with center emphasis
+        val centerDistance = abs(normalizedX - 0.5f) * 2f
+        val colorProgress = (1f - centerDistance) * normalizedX
+        val barColor = lerp(primaryColor, tertiaryColor, colorProgress)
         
         drawRoundRect(
-            color = color,
-            topLeft = Offset(x - barWidth / 2, centerY - barHeight / 2),
+            color = barColor.copy(alpha = 0.3f + (1f - centerDistance) * 0.4f),
+            topLeft = Offset(x, centerY - barHeight / 2),
             size = Size(barWidth, barHeight),
             cornerRadius = CornerRadius(barWidth / 2, barWidth / 2)
         )
@@ -104,36 +114,67 @@ private fun DrawScope.drawActiveWaveform(
     centerY: Float,
     maxBarHeight: Float,
     primaryColor: Color,
-    secondaryColor: Color
+    tertiaryColor: Color
 ) {
     val displayAmplitudes = if (amplitudes.size > barCount) {
         amplitudes.takeLast(barCount)
     } else {
-        amplitudes + List(barCount - amplitudes.size) { 0f }
+        List(barCount - amplitudes.size) { 0f } + amplitudes
     }
     
     displayAmplitudes.forEachIndexed { i, amplitude ->
-        val x = i * (barWidth + spacing) + barWidth / 2
+        val x = i * (barWidth + spacing)
         val normalizedAmplitude = amplitude.coerceIn(0f, 1f)
-        val barHeight = (normalizedAmplitude * maxBarHeight).coerceAtLeast(8f)
         
+        // Enhanced amplitude with minimum height
+        val enhancedAmplitude = if (normalizedAmplitude > 0.05f) {
+            (normalizedAmplitude * 1.3f).coerceAtMost(1f)
+        } else {
+            normalizedAmplitude
+        }
+        
+        val barHeight = (enhancedAmplitude * maxBarHeight).coerceAtLeast(6f)
+        
+        // Color gradient based on position and amplitude
         val progress = i.toFloat() / barCount
-        val color = lerp(primaryColor, secondaryColor, progress)
+        val amplitudeFactor = enhancedAmplitude * 0.5f + 0.5f
+        val barColor = lerp(primaryColor, tertiaryColor, progress)
+        
+        // Gradient effect for active bars
+        val brush = Brush.verticalGradient(
+            colors = listOf(
+                barColor.copy(alpha = 0.9f),
+                barColor.copy(alpha = 0.6f)
+            ),
+            startY = centerY - barHeight / 2,
+            endY = centerY + barHeight / 2
+        )
         
         drawRoundRect(
-            color = color,
-            topLeft = Offset(x - barWidth / 2, centerY - barHeight / 2),
+            brush = brush,
+            topLeft = Offset(x, centerY - barHeight / 2),
             size = Size(barWidth, barHeight),
             cornerRadius = CornerRadius(barWidth / 2, barWidth / 2)
         )
+        
+        // Subtle glow effect for high amplitudes
+        if (enhancedAmplitude > 0.7f) {
+            drawRoundRect(
+                color = barColor.copy(alpha = 0.2f),
+                topLeft = Offset(x - 2f, centerY - barHeight / 2 - 2f),
+                size = Size(barWidth + 4f, barHeight + 4f),
+                cornerRadius = CornerRadius(barWidth / 2 + 2f, barWidth / 2 + 2f)
+            )
+        }
     }
 }
 
 private fun lerp(start: Color, end: Color, fraction: Float): Color {
+    val clampedFraction = fraction.coerceIn(0f, 1f)
     return Color(
-        red = start.red + (end.red - start.red) * fraction,
-        green = start.green + (end.green - start.green) * fraction,
-        blue = start.blue + (end.blue - start.blue) * fraction,
-        alpha = start.alpha + (end.alpha - start.alpha) * fraction
+        red = start.red + (end.red - start.red) * clampedFraction,
+        green = start.green + (end.green - start.green) * clampedFraction,
+        blue = start.blue + (end.blue - start.blue) * clampedFraction,
+        alpha = start.alpha + (end.alpha - start.alpha) * clampedFraction
     )
 }
